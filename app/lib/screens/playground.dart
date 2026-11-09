@@ -96,7 +96,7 @@ class Playground extends StatelessWidget {
                     label: 'Get kicked',
                     hint:
                         'The server closes with code 1008 ("not allowed"), so '
-                        'easy_socket stops retrying.',
+                        'the socket stops instead of retrying.',
                     onPressed: connected ? chat.getKicked : null,
                   ),
                 ],

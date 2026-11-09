@@ -26,6 +26,7 @@ class ChatController extends ChangeNotifier {
       _socket.on('presence', _onPresence),
       _socket.on('message', _onMessage),
       _socket.on('typing', _onTyping),
+      _socket.on('closing', _onClosing),
       _socket.on('error', (data) {
         final json = data as Map<String, dynamic>;
         final error = ChatError(
@@ -237,6 +238,26 @@ class ChatController extends ChangeNotifier {
     final who = json['name'] as String;
     json['isTyping'] == true ? typing.add(who) : typing.remove(who);
     notifyListeners();
+  }
+
+  /// The server announces a close before making it. Behind some proxies
+  /// (Render's, for one) the close code itself never arrives and the
+  /// connection lingers for ~20 s, so act on the announcement right away.
+  void _onClosing(Object? data) {
+    final json = data as Map<String, dynamic>;
+    final code = json['code'] as int?;
+    final reason = json['reason'] as String?;
+    _addLog('server announced close: code $code ($reason)');
+    if (EasySocket.defaultShouldReconnect(code, reason)) {
+      // A drop: reconnect now. connect() reopens the closed socket at once,
+      // and onConnected rejoins the room.
+      _socket.close().then((_) => _socket.connect()).ignore();
+    } else {
+      // A refusal (kick, wrong token): stop, as easy_socket would on the
+      // close code itself.
+      _socket.close().ignore();
+      _onSocketError(SocketRejectedException(code, reason));
+    }
   }
 
   void _onSocketError(Object error) {

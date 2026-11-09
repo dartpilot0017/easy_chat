@@ -17,6 +17,9 @@
 /// * `drop`    the server closes the connection (1001), so it reconnects
 /// * `kick`    the server closes with 1008, which tells clients not to retry
 ///
+/// Before closing a connection itself, the server sends `closing`
+/// `{code, reason}`, because some proxies drop websocket close codes.
+///
 /// Server → client:
 /// * `welcome`     `{rooms}` (sent on every connection)
 /// * `joined`      `{room, users, history}`
@@ -82,11 +85,11 @@ class ChatServer {
       }
       final query = request.uri.queryParameters;
       final ws = await WebSocketTransformer.upgrade(request);
+      final format = WireFormat.parse(query['format']);
       if (token != null && query['token'] != token) {
-        await ws.close(4401, 'Invalid token');
+        await _Client(ws, format, log).closeWith(4401, 'Invalid token');
         return;
       }
-      final format = WireFormat.parse(query['format']);
       final client = _clients[ws] = _Client(ws, format, log);
       client.send('welcome', {'rooms': rooms});
       ws.listen(
@@ -120,9 +123,9 @@ class ChatServer {
       case 'ping':
         client.send('pong', null);
       case 'drop':
-        client.ws.close(1001, 'Dropped on request');
+        client.closeWith(1001, 'Dropped on request');
       case 'kick':
-        client.ws.close(1008, 'Kicked on request');
+        client.closeWith(1008, 'Kicked on request');
       case 'join':
         _join(client, data['name'], data['room']);
       case 'message':
@@ -271,6 +274,15 @@ class _Client {
     } on StateError {
       // The socket closed between the check and the write.
     }
+  }
+
+  /// Announces the close with a `closing` event `{code, reason}`, then
+  /// closes with that code. Some proxies (Render's, for one) don't pass close
+  /// codes on and hold the connection for ~20 s, so clients can act on the
+  /// announcement instead.
+  Future<void> closeWith(int code, String reason) {
+    send('closing', {'code': code, 'reason': reason});
+    return ws.close(code, reason);
   }
 
   void log(String message) {

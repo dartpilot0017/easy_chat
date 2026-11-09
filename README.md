@@ -22,6 +22,13 @@ websocket code beyond `on`, `emit` and a few options.
 
 On a narrow screen the playground opens from the flask icon in the top bar.
 
+**About hosting behind a proxy:** Render's proxy doesn't pass websocket close
+codes on, and keeps a closed connection open for about 20 seconds. So before
+the server closes a connection itself (drop, kick, wrong token), it sends a
+`closing` event with the code and reason, and the app acts on that straight
+away. Run locally, the real close codes arrive too, and easy_socket handles
+them on its own.
+
 ## Run it locally
 
 ```bash

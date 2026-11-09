@@ -159,8 +159,10 @@ void main() {
     test('drop reconnects and stays in the room', () async {
       final ada = connect('Ada');
       await ada.joined;
+      final states = <SocketState>[];
+      ada.addListener(() => states.add(ada.connection));
       ada.dropConnection();
-      await until(ada, () => ada.connection == SocketState.reconnecting);
+      await until(ada, () => states.contains(SocketState.closed));
       await until(ada, () => ada.connection == SocketState.connected);
       await until(ada, () => ada.users.contains('Ada'));
       expect(ada.rejection, isNull);
