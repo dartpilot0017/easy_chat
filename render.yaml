@@ -1,0 +1,16 @@
+# Render Blueprint for the demo chat server (free plan).
+# Render: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: easy-chat-demo
+    runtime: docker
+    plan: free
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    branch: main
+    autoDeploy: true
+    # The server answers plain HTTP GET / with 200; UptimeRobot pings it too.
+    healthCheckPath: /
+    envVars:
+      - key: CHAT_TOKEN
+        value: demo
