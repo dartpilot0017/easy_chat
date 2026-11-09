@@ -4,7 +4,7 @@ A Flutter chat app and a small Dart server that show off
 [easy_socket](https://pub.dev/packages/easy_socket). The app has no
 websocket code beyond `on`, `emit` and a few options.
 
-**Try it:** https://dartpilot0017.github.io/easy_chat/
+**Try it:** https://easy-chat-app.onrender.com
 (Open it in two tabs or send it to a friend to chat with each other.)
 
 ## What to try
@@ -38,6 +38,8 @@ cd app && flutter run -d chrome
   (`render.yaml`). It needs `CHAT_TOKEN=demo`. Render's free plan sleeps
   after 15 minutes without traffic; an UptimeRobot HTTP monitor on the
   server URL every 5 minutes keeps it awake.
-- **App:** GitHub Pages, built by `.github/workflows/pages.yml` on every push
-  to `main`. Set the repository variable `SERVER_URL` to the server's
+- **App:** a free Render static site serving the `web-build` branch.
+  `.github/workflows/web.yml` builds the Flutter web app on every push to
+  `main` and publishes the files to that branch (Render's build machines don't
+  have Flutter). Set the repository variable `SERVER_URL` to the server's
   `wss://` address.

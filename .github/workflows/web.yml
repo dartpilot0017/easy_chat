@@ -1,0 +1,46 @@
+name: Build web demo
+
+# Builds the Flutter web app and publishes the built files to the
+# `web-build` branch, which Render serves as a static site. Render's build
+# machines don't have Flutter, so the build happens here.
+#
+# The server address comes from the SERVER_URL repository variable
+# (Settings > Secrets and variables > Actions > Variables).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write # to push the web-build branch
+
+concurrency:
+  group: web-build
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+      - run: flutter pub get
+        working-directory: app
+      - run: >-
+          flutter build web --release
+          --dart-define=SERVER_URL=${{ vars.SERVER_URL || 'wss://easy-chat-demo.onrender.com' }}
+        working-directory: app
+      - name: Publish to the web-build branch
+        working-directory: app/build/web
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # A fresh one-commit branch each time, so it never grows.
+          git init -q -b web-build
+          git add -A
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -q -m "Web build of ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" web-build
