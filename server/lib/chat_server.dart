@@ -87,7 +87,15 @@ class ChatServer {
       final ws = await WebSocketTransformer.upgrade(request);
       final format = WireFormat.parse(query['format']);
       if (token != null && query['token'] != token) {
-        await _Client(ws, format, log).closeWith(4401, 'Invalid token');
+        // Closing the instant the connection opens makes Render's proxy
+        // drop the announcement, so give it a moment. Clients normally hang
+        // up first when they read it.
+        ws.listen((_) {}, onError: (_) {});
+        await _Client(
+          ws,
+          format,
+          log,
+        ).closeWith(4401, 'Invalid token', after: const Duration(seconds: 1));
         return;
       }
       final client = _clients[ws] = _Client(ws, format, log);
@@ -280,9 +288,14 @@ class _Client {
   /// closes with that code. Some proxies (Render's, for one) don't pass close
   /// codes on and hold the connection for ~20 s, so clients can act on the
   /// announcement instead.
-  Future<void> closeWith(int code, String reason) {
+  Future<void> closeWith(
+    int code,
+    String reason, {
+    Duration after = Duration.zero,
+  }) async {
     send('closing', {'code': code, 'reason': reason});
-    return ws.close(code, reason);
+    if (after > Duration.zero) await Future<void>.delayed(after);
+    if (ws.closeCode == null) await ws.close(code, reason);
   }
 
   void log(String message) {
