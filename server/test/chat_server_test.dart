@@ -213,4 +213,61 @@ void main() {
       expect((errors.single as SocketRejectedException).code, 1008);
     });
   });
+
+  group('sessions', () {
+    test(
+      'the same session reclaims its name from a stale connection',
+      () async {
+        final old = client();
+        old.emit('join', {'name': 'Ada', 'room': 'general', 'sessionId': 's1'});
+        await next(old, 'joined');
+
+        // The old connection is still open, as it would be behind a proxy.
+        final fresh = client();
+        fresh.emit('join', {
+          'name': 'Ada',
+          'room': 'general',
+          'sessionId': 's1',
+        });
+        final joined = await next(fresh, 'joined') as Map;
+        expect(joined['users'], ['Ada']);
+
+        await old.onStateChange
+            .firstWhere((x) => x != SocketState.connected)
+            .timeout(const Duration(seconds: 3));
+        expect(old.closeCode, 1000);
+      },
+    );
+
+    test('a different session still gets name_taken', () async {
+      final ada = client();
+      ada.emit('join', {'name': 'Ada', 'room': 'general', 'sessionId': 's1'});
+      await next(ada, 'joined');
+
+      final other = client();
+      other.emit('join', {'name': 'ada', 'room': 'general', 'sessionId': 's2'});
+      final error = await next(other, 'error') as Map;
+      expect(error['code'], 'name_taken');
+      expect(ada.isConnected, isTrue);
+    });
+
+    test('queued messages from a reclaimed session are delivered', () async {
+      final watcher = client();
+      watcher.emit('join', {'name': 'Bob', 'room': 'general'});
+      await next(watcher, 'joined');
+      final old = client();
+      old.emit('join', {'name': 'Ada', 'room': 'general', 'sessionId': 's1'});
+      await next(old, 'joined');
+
+      final fresh = client();
+      fresh.emit('message', {
+        'name': 'Ada',
+        'room': 'general',
+        'sessionId': 's1',
+        'text': 'sent while offline',
+      });
+      final message = await next(watcher, 'message') as Map;
+      expect(message['text'], 'sent while offline');
+    });
+  });
 }

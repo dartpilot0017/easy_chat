@@ -135,10 +135,12 @@ class ChatServer {
       case 'kick':
         client.closeWith(1008, 'Kicked on request');
       case 'join':
-        _join(client, data['name'], data['room']);
+        _join(client, data['name'], data['room'], data['sessionId']);
       case 'message':
         if (client.room != data['room'] || client.name == null) {
-          if (!_join(client, data['name'], data['room'])) return;
+          if (!_join(client, data['name'], data['room'], data['sessionId'])) {
+            return;
+          }
         }
         var text = (data['text'] as String? ?? '').trim();
         if (text.isEmpty) return;
@@ -183,7 +185,10 @@ class ChatServer {
     };
   }
 
-  bool _join(_Client client, Object? name, Object? room) {
+  /// [sessionId] identifies one app session across reconnects. A join from
+  /// the same session reclaims its name from a stale connection, which can
+  /// linger for ~20 s behind proxies like Render's after the client left.
+  bool _join(_Client client, Object? name, Object? room, Object? sessionId) {
     if (name is! String || name.trim().isEmpty || name.trim().length > 24) {
       client.send('error', {
         'message': 'A name of 1 to 24 characters is required.',
@@ -194,10 +199,21 @@ class ChatServer {
       client.send('error', {'message': 'Unknown room: $room'});
       return false;
     }
-    final taken = _clients.values.any(
-      (c) => c != client && c.name?.toLowerCase() == name.trim().toLowerCase(),
-    );
-    if (taken) {
+    final holder = _clients.values
+        .where(
+          (c) =>
+              c != client && c.name?.toLowerCase() == name.trim().toLowerCase(),
+        )
+        .firstOrNull;
+    if (holder != null &&
+        sessionId is String &&
+        sessionId.isNotEmpty &&
+        holder.sessionId == sessionId) {
+      // The same user on a new connection: retire the old one.
+      _clients.remove(holder.ws);
+      holder.ws.close(1000, 'Replaced by a new connection');
+      if (holder.room case final room?) _sendPresence(room);
+    } else if (holder != null) {
       client.send('error', {
         'code': 'name_taken',
         'message': 'The name "${name.trim()}" is already in use.',
@@ -207,6 +223,7 @@ class ChatServer {
     final previous = client.room;
     _setTyping(client, false);
     client
+      ..sessionId = sessionId is String ? sessionId : null
       ..name = name.trim()
       ..room = room;
     if (previous != null && previous != room) _sendPresence(previous);
@@ -265,6 +282,7 @@ class _Client {
   final codec = AutoCodec();
   final bool _log;
   String? name;
+  String? sessionId;
   String? room;
   bool isTyping = false;
 

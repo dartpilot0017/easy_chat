@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:easy_socket/easy_socket.dart';
 import 'package:flutter/foundation.dart';
@@ -54,6 +55,18 @@ class ChatController extends ChangeNotifier {
 
   final String url;
   final String name;
+
+  /// Identifies this session to the server across reconnects, so a stale
+  /// connection the server hasn't noticed yet doesn't block our own name.
+  final String sessionId = _newSessionId();
+
+  static String _newSessionId() {
+    final random = Random.secure();
+    return List.generate(
+      16,
+      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+  }
 
   /// The message format to ask the server for: `envelope`, `event` or
   /// `array`.
@@ -128,6 +141,7 @@ class ChatController extends ChangeNotifier {
     _socket.emit('message', {
       'name': name,
       'room': _room,
+      'sessionId': sessionId,
       'text': text,
       'clientId': clientId,
     });
@@ -183,7 +197,11 @@ class ChatController extends ChangeNotifier {
 
   // -------------------------------------------------------------- events
 
-  void _join() => _socket.emit('join', {'name': name, 'room': _room});
+  void _join() => _socket.emit('join', {
+    'name': name,
+    'room': _room,
+    'sessionId': sessionId,
+  });
 
   void _onWelcome(Object? data) {
     rooms = List<String>.from((data as Map)['rooms'] as List);
