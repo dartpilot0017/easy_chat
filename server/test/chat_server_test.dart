@@ -175,8 +175,6 @@ void main() {
       await s.onStateChange
           .firstWhere((x) => x == SocketState.closed)
           .timeout(const Duration(seconds: 3));
-      // easy_socket 0.1.0 reports the error just after the state change.
-      await Future<void>.delayed(Duration.zero);
       expect((errors.single as SocketRejectedException).code, 4401);
 
       final ok = withQuery({'token': 'demo'}, on: guarded);
@@ -208,8 +206,6 @@ void main() {
       await s.onStateChange
           .firstWhere((x) => x == SocketState.closed)
           .timeout(const Duration(seconds: 3));
-      // easy_socket 0.1.0 reports the error just after the state change.
-      await Future<void>.delayed(Duration.zero);
       expect((errors.single as SocketRejectedException).code, 1008);
     });
   });

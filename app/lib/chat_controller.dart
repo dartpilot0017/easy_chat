@@ -267,9 +267,9 @@ class ChatController extends ChangeNotifier {
     final reason = json['reason'] as String?;
     _addLog('server announced close: code $code ($reason)');
     if (EasySocket.defaultShouldReconnect(code, reason)) {
-      // A drop: reconnect now. connect() reopens the closed socket at once,
-      // and onConnected rejoins the room.
-      _socket.close().then((_) => _socket.connect()).ignore();
+      // A drop: reconnect now instead of waiting for the proxy to notice.
+      // onConnected rejoins the room.
+      _socket.reconnect().ignore();
     } else {
       // A refusal (kick, wrong token): stop, as easy_socket would on the
       // close code itself.

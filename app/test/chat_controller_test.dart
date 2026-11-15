@@ -162,7 +162,7 @@ void main() {
       final states = <SocketState>[];
       ada.addListener(() => states.add(ada.connection));
       ada.dropConnection();
-      await until(ada, () => states.contains(SocketState.closed));
+      await until(ada, () => states.contains(SocketState.reconnecting));
       await until(ada, () => ada.connection == SocketState.connected);
       await until(ada, () => ada.users.contains('Ada'));
       expect(ada.rejection, isNull);
